@@ -3,12 +3,13 @@
 
 module alu_control(
       input wire       func7_5,
+      input wire       funct7_0,
       input wire [2:0] func3,
 		input wire [1:0] alu_op,
 		output reg [3:0] alu_control
    );
 
-   
+
    //The ALUOP codes can be found
    //in chapter 4.4 of the book.
    parameter [1:0] ADD_OPCODE    = 2'b00;
@@ -39,13 +40,13 @@ module alu_control(
    parameter [3:0] FUNC_SRL      = 4'b0101;
 
 	reg [3:0] rtype_op;
-   
+
    always @(*) begin
 		case(function_field)
 		   FUNC_ADD	:  rtype_op = ADD_OP;
 		   FUNC_SUB	:  rtype_op = SUB_OP;
 		   FUNC_AND	:  rtype_op = AND_OP;
-		   FUNC_OR 	:  rtype_op = OR_OP; 
+		   FUNC_OR 	:  rtype_op = OR_OP;
 		   FUNC_SLT	:  rtype_op = SLT_OP;
 		   FUNC_SLL	:  rtype_op = SLL_OP;
 		   FUNC_SRL	:  rtype_op = SRL_OP;
@@ -63,4 +64,3 @@ module alu_control(
 	end
 
 endmodule
-

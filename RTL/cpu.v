@@ -3,7 +3,7 @@
 
 //Inputs:
 //	clk: main clock
-//	arst_n: reset 
+//	arst_n: reset
 // enable: Starts the execution
 //	addr_ext: Address for reading/writing content to Instruction Memory
 //	wen_ext: Write enable for Instruction Memory
@@ -32,7 +32,7 @@ module cpu(
 		input  wire         wen_ext_2,
 		input  wire         ren_ext_2,
 		input  wire [63:0]  wdata_ext_2,
-		
+
 		output wire	[31:0]  rdata_ext,
 		output wire	[63:0]  rdata_ext_2
 
@@ -82,9 +82,9 @@ sram_BW32 #(
    .wen      (1'b0          ),
    .ren      (1'b1          ),
    .wdata    (32'b0         ),
-   .rdata    (instruction   ),   
+   .rdata    (instruction   ),
    .addr_ext (addr_ext      ),
-   .wen_ext  (wen_ext       ), 
+   .wen_ext  (wen_ext       ),
    .ren_ext  (ren_ext       ),
    .wdata_ext(wdata_ext     ),
    .rdata_ext(rdata_ext     )
@@ -100,7 +100,7 @@ sram_BW64 #(
    .wen      (mem_write      ),
    .ren      (mem_read       ),
    .wdata    (regfile_rdata_2),
-   .rdata    (mem_data       ),   
+   .rdata    (mem_data       ),
    .addr_ext (addr_ext_2     ),
    .wen_ext  (wen_ext_2      ),
    .ren_ext  (ren_ext_2      ),
@@ -137,6 +137,7 @@ register_file #(
 
 alu_control alu_ctrl(
    .func7_5       (instruction[30]   ),
+	 .funct7_0				(instruction[25]),
    .func3          (instruction[14:12]),
    .alu_op         (alu_op            ),
    .alu_control    (alu_control       )
@@ -182,5 +183,3 @@ branch_unit#(
 
 
 endmodule
-
-
