@@ -52,28 +52,25 @@ wire [      63:0] regfile_wdata_MEM_WB,mem_data,alu_out,
                   alu_operand_2;
 
 wire signed [63:0] immediate_extended, immediate_extended_ID_EXE;
+
 // instruction
 wire [31:0] instruction_IF_ID;
+wire [9:0] instruction_ID_EXE,
+wire [4:0] instruction_EXE_MEM, instruction_MEM_WB;
+//wire [4:0] ALU_instruction_ID_EXE;
 
-immediate_extend_unit immediate_extend_u(
-    .instruction         (instruction_IF_ID),
-    .immediate_extended  (immediate_extended)
-);
+// ALU
+wire [63:0] alu_out_EXE_MEM;
 
-// immediate pipeline register
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg_im_ext(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din (immediate_extended),
-		 .dout (immediate_extended_ID_EXE)
-);
+// register file
+wire [63:0]  regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE;
 
 // program counter
-wire [63:0] branch_pc_EXE_MEM,jump_pc_EXE_MEM, updated_pc_IF_ID, updated_pc_ID_EXE;
+wire [63:0] branch_pc_EXE_MEM, jump_pc_EXE_MEM, updated_pc_IF_ID, updated_pc_ID_EXE;
 
+///////// IF stage begin
+
+// program counter
 pc #(
    .DATA_W(64)
 ) program_counter (
@@ -88,36 +85,6 @@ pc #(
    .enable    (enable    ),
    .updated_pc(updated_pc)
 );
-
-// IF_ID Pipeline register for updated program counter Signal
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg_updated_pc(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din (updated_pc),
-		 .dout (updated_pc_IF_ID)
-);
-
-// ID_EXE Pipeline register for program counter Signal
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg_updated_pc_IF_ID(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din (updated_pc_IF_ID),
-		 .dout (updated_pc_ID_EXE)
-);
-
-
-
-// write address
-wire [4:0] instruction_ID_EXE, instruction_EXE_MEM, instruction_MEM_WB;
-
-// ALU control
-wire [4:0] ALU_instruction_ID_EXE;
 
 // The instruction memory.
 sram_BW32 #(
@@ -137,6 +104,21 @@ sram_BW32 #(
    .rdata_ext(rdata_ext     )
 );
 
+///////// IF stage end
+
+///////// IF_ID REG BEGIN
+
+// IF_ID Pipeline register for updated program counter Signal
+reg_arstn_en #(
+	.DATA_W(64)
+	)reg_updated_pc(
+		 .clk	(clk),
+		 .arst_n	(arst_n),
+		 .en	(enable),
+		 .din (updated_pc),
+		 .dout (updated_pc_IF_ID)
+);
+
 // IF_ID Pipeline register for write address instruction Signal
 reg_arstn_en #(
 	.DATA_W(32)
@@ -148,27 +130,149 @@ reg_arstn_en #(
 		 .dout (instruction_IF_ID)
 );
 
-// ID_EXE Pipeline register for write address instruction Signal
+///////// IF_ID REG END
+
+
+///////// ID STAGE BEGIN
+
+immediate_extend_unit immediate_extend_u(
+    .instruction         (instruction_IF_ID),
+    .immediate_extended  (immediate_extended)
+);
+
+control_unit control_unit(
+   .opcode   (instruction[6:0]),
+   .alu_op   (alu_op_ID_EXE          ),
+   .reg_dst  (reg_dst         ),
+   .branch   (branch          ),
+   .mem_read (mem_read        ),
+   .mem_2_reg(mem_2_reg       ),
+   .mem_write(mem_write       ),
+   .alu_src  (alu_src         ),
+   .reg_write(reg_write       ),
+   .jump     (jump            )
+);
+
+register_file #(
+   .DATA_W(64)
+) register_file(
+   .clk      (clk               ),
+   .arst_n   (arst_n            ),
+   .reg_write(reg_write_WB      ),
+   .raddr_1  (instruction_IF_ID[19:15]),
+   .raddr_2  (instruction_IF_ID[24:20]),
+   .waddr    (instruction_MEM_WB),
+   .wdata    (regfile_wdata_MEM_WB    ),
+   .rdata_1  (regfile_rdata_1),
+   .rdata_2  (regfile_rdata_2)
+);
+
+///////// ID STAGE END
+
+
+///////// ID_EX REG BEGIN
+
+// immediate pipeline register
 reg_arstn_en #(
-	.DATA_W(5)
+	.DATA_W(64)
+	)reg_im_ext(
+		 .clk	(clk),
+		 .arst_n	(arst_n),
+		 .en	(enable),
+		 .din (immediate_extended),
+		 .dout (immediate_extended_ID_EXE)
+);
+
+// ID_EXE Pipeline register for program counter Signal
+reg_arstn_en #(
+	.DATA_W(64)
+	)reg_updated_pc_IF_ID(
+		 .clk	(clk),
+		 .arst_n	(arst_n),
+		 .en	(enable),
+		 .din (updated_pc_IF_ID),
+		 .dout (updated_pc_ID_EXE)
+);
+
+// ID_EXE Pipeline register for instruction Signal
+reg_arstn_en #(
+	.DATA_W(10)
 	)reg_instruction_ID_EXE(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din (instruction_IF_ID[11:7]),
+		 .din ({ instruction_IF_ID[30], instruction_IF_ID[25], instruction_IF_ID[14:12], instruction_IF_ID[11:7] }),
 		 .dout (instruction_ID_EXE)
 );
 
-// ID_EXE Pipeline register for ALU control instruction Signal
+// ID_EXE Pipeline register for rdata Signal
 reg_arstn_en #(
-	.DATA_W(5)
-	)reg_instructionidk(
+	.DATA_W(128)
+	)reg_regfile_rdata(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din ({instruction_IF_ID[30], instruction_IF_ID[25], instruction_IF_ID[14:12] }),
-		 .dout (ALU_instruction_ID_EXE)
+		 .din ({regfile_rdata_1, regfile_rdata_2}),
+		 .dout ({regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE})
 );
+
+// ID_EXE Pipeline register for control signals
+reg_arstn_en #(
+	.DATA_W(8)
+	)reg2_control(
+		 .clk	(clk),
+		 .arst_n	(arst_n),
+		 .en	(enable),
+		 .din ({reg_write, mem_2_reg, mem_write, mem_read, branch, alu_src, alu_op}),
+		 .dout ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE, alu_src_ID_EXE, alu_op_ID_EXE})
+);
+
+///////// ID_EX REG END
+
+
+///////// EX STAGE BEGIN
+
+alu_control alu_ctrl(
+   .func7_5       (instruction_ID_EXE[9]  ),
+	 .funct7_0		(instruction_ID_EXE[8]),
+   .func3          (instruction[7:5]),
+   .alu_op         (alu_op_ID_EXE    ),
+   .alu_control    (alu_control      )
+);
+
+mux_2 #(
+   .DATA_W(64)
+) alu_operand_mux (
+   .input_a (immediate_extended_ID_EXE),
+   .input_b (regfile_rdata_2_ID_EXE   ),
+   .select_a (alu_src_IDE_EXE          ),
+   .mux_out (alu_operand_2     )
+);
+
+alu#(
+   .DATA_W(64)
+) alu(
+   .alu_in_0 (regfile_rdata_1_ID_EXE ),
+   .alu_in_1 (alu_operand_2   ),
+   .alu_ctrl (alu_control     ),
+   .alu_out  (alu_out         ),
+   .zero_flag(zero_flag       ),
+   .overflow (                )
+);
+
+branch_unit#(
+   .DATA_W(64)
+)branch_unit(
+   .updated_pc         (updated_pc_ID_EXE     ),
+   .immediate_extended (immediate_extended_ID_EXE),
+   .branch_pc          (branch_pc         ),
+   .jump_pc            (jump_pc           )
+);
+
+///////// EX STAGE END
+
+
+///////// EX_MEM REG BEGIN
 
 // EXE_MEM Pipeline register for write address instruction Signal
 reg_arstn_en #(
@@ -181,17 +285,54 @@ reg_arstn_en #(
 		 .dout (instruction_EXE_MEM)
 );
 
-// MEM_WB Pipeline register for instruction Signal
+// ALU + zero flag pipeline reg
 reg_arstn_en #(
-	.DATA_W(5)
-	)reg_instruction_MEM_WB(
+	.DATA_W(65)
+	)reg_ALU_zero_flag(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din (instruction_EXE_MEM),
-		 .dout (instruction_MEM_WB)
+		 .din ({zero_flag, alu_out}),
+		 .dout ({{zero_flag_EXE_MEM}, {alu_out_EXE_MEM}})
 );
-wire [63:0] alu_out_EXE_MEM;
+
+// EXE_MEM Pipeline register for immediate extend signal
+reg_arstn_en #(
+	.DATA_W(64)
+	)reg3_imm_extend(
+		 .clk	(clk),
+		 .arst_n(arst_n),
+		 .en	(enable),
+		 .din (regfile_rdata_2_ID_EXE),
+		 .dout (regfile_rdata_2_EXE_MEM)
+);
+
+// EX_MEM Pipeline register for branch_pc and jump_pc Signal
+reg_arstn_en #(
+	.DATA_W(128)
+	)reg_branch_unit_EXE_MEM(
+		 .clk	(clk),
+		 .arst_n(arst_n),
+		 .en	(enable),
+		 .din ({branch_pc, jump_pc}),
+		 .dout ({branch_pc_EXE_MEM, jump_pc_EXE_MEM})
+);
+
+// EX_MEM Pipeline register for control signals
+reg_arstn_en #(
+	.DATA_W(5)
+	)reg3_control(
+		 .clk	(clk),
+		 .arst_n	(arst_n),
+		 .en	(enable),
+		 .din ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE}),
+		 .dout ({reg_write_EXE_MEM, mem_2_reg_EXE_MEM, mem_write_EXE_MEM, mem_read_EXE_MEM, branch_EXE_MEM})
+);
+
+///////// EX_MEM REG END
+
+
+///////// MEM STAGE BEGIN
 
 // The data memory.
 sram_BW64 #(
@@ -211,97 +352,59 @@ sram_BW64 #(
    .rdata_ext(rdata_ext_2    )
 );
 
-control_unit control_unit(
-   .opcode   (instruction[6:0]),
-   .alu_op   (alu_op_ID_EXE          ),
-   .reg_dst  (reg_dst         ),
-   .branch   (branch          ),
-   .mem_read (mem_read        ),
-   .mem_2_reg(mem_2_reg       ),
-   .mem_write(mem_write       ),
-   .alu_src  (alu_src         ),
-   .reg_write(reg_write       ),
-   .jump     (jump            )
-);
+///////// MEM STAGE END
 
-// register file
-wire [63:0] regfile_rdata_1_IF_ID ,regfile_rdata_2_IF_ID, regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE;
 
-register_file #(
-   .DATA_W(64)
-) register_file(
-   .clk      (clk               ),
-   .arst_n   (arst_n            ),
-   .reg_write(reg_write_WB      ),
-   .raddr_1  (instruction_IF_ID[19:15]),
-   .raddr_2  (instruction_IF_ID[24:20]),
-   .waddr    (instruction_MEM_WB),
-   .wdata    (regfile_wdata_MEM_WB    ),
-   .rdata_1  (regfile_rdata_1_IF_ID   ),
-   .rdata_2  (regfile_rdata_2_IF_ID   )
-);
+///////// MEM_WB REG BEGIN
 
-// ID_EXE Pipeline register for rdata Signal
+// MEM_WB Pipeline register for instruction Signal
 reg_arstn_en #(
-	.DATA_W(128)
-	)reg_regfile_rdata(
+	.DATA_W(5)
+	)reg_instruction_MEM_WB(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din ({regfile_rdata_1_IF_ID, regfile_rdata_2_IF_ID}),
-		 .dout ({regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE})
+		 .din (instruction_EXE_MEM),
+		 .dout (instruction_MEM_WB)
 );
 
-alu_control alu_ctrl(
-   .func7_5       (ALU_instruction_ID_EXE[4]  ),
-	.funct7_0		(ALU_instruction_ID_EXE[3]),
-   .func3          (instruction[2:0]),
-   .alu_op         (alu_op_ID_EXE    ),
-   .alu_control    (alu_control       )
-);
-
-mux_2 #(
-   .DATA_W(64)
-) alu_operand_mux (
-   .input_a (immediate_extended_ID_EXE),
-   .input_b (regfile_rdata_2_ID_EXE   ),
-   .select_a(alu_src_IDE_EXE           ),
-   .mux_out (alu_operand_2     )
-);
-
-alu#(
-   .DATA_W(64)
-) alu(
-   .alu_in_0 (regfile_rdata_1_ID_EXE ),
-   .alu_in_1 (alu_operand_2   ),
-   .alu_ctrl (alu_control     ),
-   .alu_out  (alu_out         ),
-   .zero_flag(zero_flag       ),
-   .overflow (                )
-);
-
-
-// ALU zero flag pipeline reg
-reg_arstn_en #(
-	.DATA_W(65)
-	)reg_ALU_zero_flag(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din ({zero_flag, alu_out}),
-		 .dout ({{zero_flag_EXE_MEM}, {alu_out_EXE_MEM}})
-);
-//immediate extend pipeline reg3
+// MEM_WB Pipeline register for mem data
 reg_arstn_en #(
 	.DATA_W(64)
-	)reg3_imm_extend(
+	)reg4_mem_data_data(
 		 .clk	(clk),
 		 .arst_n(arst_n),
 		 .en	(enable),
-		 .din (regfile_rdata_2_ID_EXE),
-		 .dout (regfile_rdata_2_EXE_MEM)
+		 .din (mem_data),
+		 .dout (mem_data_WB)
 );
 
+// MEM_WB Pipeline register for ALU data
+reg_arstn_en #(
+	.DATA_W(64)
+	)reg4_alu_out(
+		 .clk	(clk),
+		 .arst_n(arst_n),
+		 .en	(enable),
+		 .din (alu_out_EXE_MEM),
+		 .dout (alu_out_WB)
+);
+
+// MEM_WB Pipeline register for control signals
+reg_arstn_en #(
+	.DATA_W(2)
+	)udikkemoeder(
+		 .clk	(clk),
+		 .arst_n(arst_n),
+		 .en	(enable),
+		 .din ({reg_write_EXE_MEM, mem_2_reg_EXE_MEM}),
+		 .dout ({reg_write_WB, mem_2_reg_WB})
+);
+
+///////// MEM_WB REG END
+
+
+///////// WB STAGE BEGIN
 
 wire [63:0] mem_data_WB, alu_out_WB;
 mux_2 #(
@@ -313,78 +416,7 @@ mux_2 #(
    .mux_out  (regfile_wdata_MEM_WB)
 );
 
-//reg 4 for mem data
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg4_mem_data_data(
-		 .clk	(clk),
-		 .arst_n(arst_n),
-		 .en	(enable),
-		 .din (mem_data),
-		 .dout (mem_data_WB)
-);
-//reg 4 for alu data
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg4_alu_out(
-		 .clk	(clk),
-		 .arst_n(arst_n),
-		 .en	(enable),
-		 .din (alu_out_EXE_MEM),
-		 .dout (alu_out_WB)
-);
+///////// WB STAGE END
 
-branch_unit#(
-   .DATA_W(64)
-)branch_unit(
-   .updated_pc         (updated_pc_ID_EXE     ),
-   .immediate_extended (immediate_extended_ID_EXE),
-   .branch_pc          (branch_pc         ),
-   .jump_pc            (jump_pc           )
-);
-
-// EX_MEM Pipeline register for branch_pc and jump_pc Signal HMM I think i fucked this one up
-reg_arstn_en #(
-	.DATA_W(128)
-	)reg_EXE_MEM(
-		 .clk	(clk),
-		 .arst_n(arst_n),
-		 .en	(enable),
-		 .din ({branch_pc, jump_pc}),
-		 .dout ({branch_pc_EXE_MEM, jump_pc_EXE_MEM})
-);
-
-//// Pipeline reg 2 control reg
-reg_arstn_en #(
-	.DATA_W(8)
-	)reg2_control(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din ({reg_write, mem_2_reg, mem_write, mem_read, branch, alu_src, alu_op}),
-		 .dout ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE, alu_src_ID_EXE, alu_op_ID_EXE})
-);
-
-//// Pipeline reg 3 control reg
-reg_arstn_en #(
-	.DATA_W(5)
-	)reg3_control(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE}),
-		 .dout ({reg_write_EXE_MEM, mem_2_reg_EXE_MEM, mem_write_EXE_MEM, mem_read_EXE_MEM, branch_EXE_MEM})
-);
-
-//// Pipeline reg 4 control reg
-reg_arstn_en #(
-	.DATA_W(2)
-	)udikkemoeder(
-		 .clk	(clk),
-		 .arst_n(arst_n),
-		 .en	(enable),
-		 .din ({reg_write_EXE_MEM, mem_2_reg_EXE_MEM}),
-		 .dout ({reg_write_WB, mem_2_reg_WB})
-);
 
 endmodule
