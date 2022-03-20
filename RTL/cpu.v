@@ -38,6 +38,7 @@ module cpu(
 
    );
 
+
 wire              zero_flag, zero_flag_EXE_MEM;
 wire [      63:0] branch_pc,updated_pc,current_pc,jump_pc;
 wire [      31:0] instruction;
@@ -45,7 +46,7 @@ wire [       1:0] alu_op, alu_op_ID_EXE;
 wire [       3:0] alu_control;
 wire              reg_dst, branch, branch_ID_EXE, branch_EXE_MEM,mem_read, mem_read_ID_EXE, mem_read_EXE_MEM,
 				  				mem_2_reg, mem_2_reg_ID_EXE, mem_2_reg_EXE_MEM, mem_2_reg_MEM_WB,
-                  mem_write,mem_write_ID_EXE, mem_write_EXE_MEM, alu_src, alu_src_IDE_EXE, reg_write, reg_write_ID_EXE, reg_write_EXE_MEM,
+                  mem_write,mem_write_ID_EXE, mem_write_EXE_MEM, alu_src, alu_src_ID_EXE, reg_write, reg_write_ID_EXE, reg_write_EXE_MEM,
 									reg_write_MEM_WB, jump, jump_ID_EXE, jump_EXE_MEM;
 
 wire [       4:0] regfile_waddr;
@@ -56,14 +57,15 @@ wire signed [63:0] immediate_extended, immediate_extended_ID_EXE;
 
 // instruction
 wire [31:0] instruction_IF_ID;
-wire [9:0] instruction_ID_EXE,
+wire [9:0] instruction_ID_EXE;
 wire [4:0] instruction_EXE_MEM, instruction_MEM_WB;
+
 
 // ALU
 wire [63:0] alu_out_EXE_MEM;
 
 // register file
-wire [63:0]  regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE, regfile_rdata_2_EXE_MEM,;
+wire [63:0]  regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE, regfile_rdata_2_EXE_MEM;
 
 // program counter
 wire [63:0] branch_pc_EXE_MEM, jump_pc_EXE_MEM, updated_pc_IF_ID, updated_pc_ID_EXE;
@@ -189,7 +191,7 @@ reg_arstn_en #(
 // ID_EXE Pipeline register for updated program counter
 reg_arstn_en #(
 	.DATA_W(64)
-	)reg_updated_pc_IF_ID(
+	)reg_updated_pc_ID_EXE(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
@@ -248,7 +250,7 @@ mux_2 #(
 ) alu_operand_mux (
    .input_a (immediate_extended_ID_EXE),
    .input_b (regfile_rdata_2_ID_EXE   ),
-   .select_a (alu_src_IDE_EXE          ),
+   .select_a (alu_src_ID_EXE          ),
    .mux_out (alu_operand_2     )
 );
 
@@ -360,7 +362,7 @@ sram_BW64 #(
 
 ///////// MEM_WB REG BEGIN
 
-// MEM_WB Pipeline register for instruction 
+// MEM_WB Pipeline register for instruction
 reg_arstn_en #(
 	.DATA_W(5)
 	)reg_instruction_MEM_WB(
