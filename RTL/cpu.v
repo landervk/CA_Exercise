@@ -51,15 +51,14 @@ wire              reg_dst, branch, branch_ID_EXE, branch_EXE_MEM,mem_read, mem_r
 
 wire [       4:0] regfile_waddr;
 wire [      63:0] regfile_wdata ,mem_data,alu_out,
-                  regfile_rdata_1,regfile_rdata_2, alu_operand_2;
+                  regfile_rdata_1,regfile_rdata_2, alu_operand_1, alu_operand_2, alu_operand_2_i;
 
 wire signed [63:0] immediate_extended, immediate_extended_ID_EXE;
 
 // instruction
 wire [31:0] instruction_IF_ID;
-wire [9:0] instruction_ID_EXE;
+wire [19:0] instruction_ID_EXE;
 wire [4:0] instruction_EXE_MEM, instruction_MEM_WB;
-
 
 // ALU
 wire [63:0] alu_out_EXE_MEM, alu_out_MEM_WB;
@@ -72,6 +71,9 @@ wire [63:0] branch_pc_EXE_MEM, jump_pc_EXE_MEM, updated_pc_IF_ID, updated_pc_ID_
 
 // memory
 wire [63:0] mem_data_MEM_WB;
+
+// forwarding unit
+wire [1:0] alu_forward_A, alu_forward_B;
 
 ///////// IF stage begin
 
@@ -199,16 +201,21 @@ reg_arstn_en #(
 		 .dout (updated_pc_ID_EXE)
 );
 
-// ID_EXE Pipeline register for instruction
+// ID_EXE Pipeline register for instruction: {func7_5, funct7_0, func3, Rs2, Rs1, Rd}
+wire [4:0] Rs1_ID_EXE, Rs2_ID_EXE;
+
 reg_arstn_en #(
-	.DATA_W(10)
+	.DATA_W(20)
 	)reg_instruction_ID_EXE(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din ({ instruction_IF_ID[30], instruction_IF_ID[25], instruction_IF_ID[14:12], instruction_IF_ID[11:7] }),
+		 .din ({ instruction_IF_ID[30], instruction_IF_ID[25], instruction_IF_ID[14:12], instruction_IF_ID[24:20], instruction_IF_ID[19:15], instruction_IF_ID[11:7] }),
 		 .dout (instruction_ID_EXE)
 );
+
+assign Rs2_ID_EXE = instruction_ID_EXE[14:10];
+assign Rs1_ID_EXE = instruction_ID_EXE[9:5];
 
 // ID_EXE Pipeline register for rdata
 reg_arstn_en #(
@@ -238,9 +245,9 @@ reg_arstn_en #(
 ///////// EX STAGE BEGIN
 
 alu_control alu_ctrl(
-   .func7_5       (instruction_ID_EXE[9]  ),
-	 .funct7_0		(instruction_ID_EXE[8]),
-   .func3          (instruction_ID_EXE[7:5]),
+   .func7_5       (instruction_ID_EXE[19]  ),
+	 .funct7_0		(instruction_ID_EXE[18]),
+   .func3          (instruction_ID_EXE[17:15]),
    .alu_op         (alu_op_ID_EXE    ),
    .alu_control    (alu_control      )
 );
@@ -251,13 +258,33 @@ mux_2 #(
    .input_a (immediate_extended_ID_EXE),
    .input_b (regfile_rdata_2_ID_EXE   ),
    .select_a (alu_src_ID_EXE          ),
+   .mux_out (alu_operand_2_i     )
+);
+
+mux_3 #(
+   .DATA_W(64)
+) alu_forwarding_mux_A (
+   .input_a (regfile_rdata_1_ID_EXE),
+   .input_b (regfile_wdata   ),
+	 .input_c (alu_out_EXE_MEM ),
+   .select_a (2'b01         ), //alu_forward_A
+   .mux_out (alu_operand_1    )
+);
+
+mux_3 #(
+   .DATA_W(64)
+) alu_forwarding_mux_B (
+   .input_a (alu_operand_2_i ),
+   .input_b (regfile_wdata   ),
+	 .input_c (alu_out_EXE_MEM ),
+   .select_a (2'b01         ),	// alu_forward_B
    .mux_out (alu_operand_2     )
 );
 
 alu#(
    .DATA_W(64)
 ) alu(
-   .alu_in_0 (regfile_rdata_1_ID_EXE ),
+   .alu_in_0 (alu_operand_1   ),
    .alu_in_1 (alu_operand_2   ),
    .alu_ctrl (alu_control     ),
    .alu_out  (alu_out         ),

@@ -5,6 +5,7 @@
 ../RTL/cpu.v
 ../RTL/immediate_extend_unit.v
 ../RTL/mux_2.v
+../RTL/mux_3.v
 ../RTL/pc.v
 ../RTL/reg_arstn.v
 ../RTL/reg_arstn_en.v
