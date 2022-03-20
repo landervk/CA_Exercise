@@ -9,18 +9,13 @@ module mux_3
       output reg  [DATA_W-1:0] mux_out
    );
 
-   /*always@(*)begin
-      if(select_a[1] == 1'b1)begin
-         mux_out = input_c;
-      end else begin
-         if (select_a[0] == 1'b1) begin
-            mux_out = input_a;
-         end else mux_out = input_b;
-      end
+   always@(*)begin
+      case (select_a)
+          2'b01: mux_out = input_a;
+          2'b10: mux_out = input_b;
+          2'b11: mux_out = input_c;
+          default: mux_out = input_a;
+      endcase
    end
-   */
 
-   always@(*) begin
-      mux_out = input_a;
-   end
 endmodule

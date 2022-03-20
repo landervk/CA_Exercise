@@ -51,7 +51,7 @@ wire              reg_dst, branch, branch_ID_EXE, branch_EXE_MEM,mem_read, mem_r
 
 wire [       4:0] regfile_waddr;
 wire [      63:0] regfile_wdata ,mem_data,alu_out,
-                  regfile_rdata_1,regfile_rdata_2, alu_operand_1, alu_operand_2, alu_operand_2_i;
+                  regfile_rdata_1,regfile_rdata_2, regfile_rdata_1_forward, regfile_rdata_2_forward, alu_operand_2;
 
 wire signed [63:0] immediate_extended, immediate_extended_ID_EXE;
 
@@ -252,39 +252,50 @@ alu_control alu_ctrl(
    .alu_control    (alu_control      )
 );
 
-mux_2 #(
-   .DATA_W(64)
-) alu_operand_mux (
-   .input_a (immediate_extended_ID_EXE),
-   .input_b (regfile_rdata_2_ID_EXE   ),
-   .select_a (alu_src_ID_EXE          ),
-   .mux_out (alu_operand_2_i     )
-);
-
 mux_3 #(
    .DATA_W(64)
 ) alu_forwarding_mux_A (
    .input_a (regfile_rdata_1_ID_EXE),
    .input_b (regfile_wdata   ),
 	 .input_c (alu_out_EXE_MEM ),
-   .select_a (2'b01         ), //alu_forward_A
-   .mux_out (alu_operand_1    )
+   .select_a (alu_forward_A      ),
+   .mux_out (regfile_rdata_1_forward   )
 );
 
 mux_3 #(
    .DATA_W(64)
 ) alu_forwarding_mux_B (
-   .input_a (alu_operand_2_i ),
+   .input_a (regfile_rdata_2_ID_EXE ),
    .input_b (regfile_wdata   ),
 	 .input_c (alu_out_EXE_MEM ),
-   .select_a (2'b01         ),	// alu_forward_B
+   .select_a (alu_forward_B      ),
+   .mux_out (regfile_rdata_2_forward     )
+);
+
+mux_2 #(
+   .DATA_W(64)
+) alu_operand_mux (
+   .input_a (immediate_extended_ID_EXE),
+   .input_b (regfile_rdata_2_forward   ),
+   .select_a (alu_src_ID_EXE          ),
    .mux_out (alu_operand_2     )
+);
+
+forwarding_unit forwarding(
+	 .Rs1_ID_EXE	(Rs1_ID_EXE),
+	 .Rs2_ID_EXE	(Rs2_ID_EXE),
+	 .Rd_EXE_MEM	(instruction_EXE_MEM),
+	 .Rd_MEM_WB		(instruction_MEM_WB),
+	 .reg_write_EXE_MEM	(reg_write_EXE_MEM),
+	 .reg_write_MEM_WB	(reg_write_MEM_WB),
+	 .alu_forward_A		(alu_forward_A),
+	 .alu_forward_B		(alu_forward_B)
 );
 
 alu#(
    .DATA_W(64)
 ) alu(
-   .alu_in_0 (alu_operand_1   ),
+   .alu_in_0 (regfile_rdata_1_forward   ),
    .alu_in_1 (alu_operand_2   ),
    .alu_ctrl (alu_control     ),
    .alu_out  (alu_out         ),
@@ -328,14 +339,14 @@ reg_arstn_en #(
 		 .dout ({zero_flag_EXE_MEM, alu_out_EXE_MEM})
 );
 
-// EXE_MEM Pipeline register for regfile_rdata2
+// EXE_MEM Pipeline register for regfile_rdata2: regfile_rdata_2_ID_EXE --> regfile_rdata_2_forward (forwarding)
 reg_arstn_en #(
 	.DATA_W(64)
 	)reg_regfile_rdata2_EXE_MEM(
 		 .clk	(clk),
 		 .arst_n(arst_n),
 		 .en	(enable),
-		 .din (regfile_rdata_2_ID_EXE),
+		 .din (regfile_rdata_2_forward),
 		 .dout (regfile_rdata_2_EXE_MEM)
 );
 
