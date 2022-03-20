@@ -240,7 +240,7 @@ reg_arstn_en #(
 alu_control alu_ctrl(
    .func7_5       (instruction_ID_EXE[9]  ),
 	 .funct7_0		(instruction_ID_EXE[8]),
-   .func3          (instruction[7:5]),
+   .func3          (instruction_ID_EXE[7:5]),
    .alu_op         (alu_op_ID_EXE    ),
    .alu_control    (alu_control      )
 );
