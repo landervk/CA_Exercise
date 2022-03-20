@@ -62,7 +62,7 @@ wire [4:0] instruction_EXE_MEM, instruction_MEM_WB;
 
 
 // ALU
-wire [63:0] alu_out_EXE_MEM;
+wire [63:0] alu_out_EXE_MEM, alu_out_MEM_WB;
 
 // register file
 wire [63:0]  regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE, regfile_rdata_2_EXE_MEM;
@@ -70,8 +70,8 @@ wire [63:0]  regfile_rdata_1_ID_EXE, regfile_rdata_2_ID_EXE, regfile_rdata_2_EXE
 // program counter
 wire [63:0] branch_pc_EXE_MEM, jump_pc_EXE_MEM, updated_pc_IF_ID, updated_pc_ID_EXE;
 
-// WB
-wire [63:0] mem_data_MEM_WB, alu_out_MEM_WB;
+// memory
+wire [63:0] mem_data_MEM_WB;
 
 ///////// IF stage begin
 
