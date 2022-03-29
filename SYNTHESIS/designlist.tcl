@@ -6,6 +6,7 @@ set verilog_files { \
    alu_control
    branch_unit
    control_unit
+   forward_unit
    cpu
    immediate_extend_unit
    mux_2

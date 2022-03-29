@@ -11,9 +11,9 @@ module mux_3
 
    always@(*)begin
       case (select_a)
-          2'b01: mux_out = input_a;
-          2'b10: mux_out = input_b;
-          2'b11: mux_out = input_c;
+          2'b00: mux_out = input_a;
+          2'b01: mux_out = input_b;
+          2'b10: mux_out = input_c;
           default: mux_out = input_a;
       endcase
    end

@@ -72,7 +72,7 @@ wire [63:0] branch_pc_EXE_MEM, jump_pc_EXE_MEM, updated_pc_IF_ID, updated_pc_ID_
 // memory
 wire [63:0] mem_data_MEM_WB;
 
-// forwarding unit
+// forward unit
 wire [1:0] alu_forward_A, alu_forward_B;
 
 ///////// IF stage begin
@@ -246,7 +246,7 @@ reg_arstn_en #(
 
 alu_control alu_ctrl(
    .func7_5       (instruction_ID_EXE[19]  ),
-	 .funct7_0		(instruction_ID_EXE[18]),
+   .funct7_0		(instruction_ID_EXE[18]),
    .func3          (instruction_ID_EXE[17:15]),
    .alu_op         (alu_op_ID_EXE    ),
    .alu_control    (alu_control      )
@@ -254,7 +254,7 @@ alu_control alu_ctrl(
 
 mux_3 #(
    .DATA_W(64)
-) alu_forwarding_mux_A (
+) alu_forward_mux_A (
    .input_a (regfile_rdata_1_ID_EXE),
    .input_b (regfile_wdata   ),
 	 .input_c (alu_out_EXE_MEM ),
@@ -264,24 +264,24 @@ mux_3 #(
 
 mux_3 #(
    .DATA_W(64)
-) alu_forwarding_mux_B (
+) alu_forward_mux_B (
    .input_a (regfile_rdata_2_ID_EXE ),
    .input_b (regfile_wdata   ),
-	 .input_c (alu_out_EXE_MEM ),
+	.input_c (alu_out_EXE_MEM ),
    .select_a (alu_forward_B      ),
    .mux_out (regfile_rdata_2_forward     )
 );
 
-mux_2 #(
-   .DATA_W(64)
-) alu_operand_mux (
-   .input_a (immediate_extended_ID_EXE),
-   .input_b (regfile_rdata_2_forward   ),
-   .select_a (alu_src_ID_EXE          ),
-   .mux_out (alu_operand_2     )
-);
+// mux_2 #(
+   // .DATA_W(64)
+// ) alu_operand_mux (
+   // .input_a (immediate_extended_ID_EXE),
+   // .input_b (regfile_rdata_2_forward   ),
+   // .select_a (alu_src_ID_EXE          ),
+   // .mux_out (alu_operand_2     )
+// );
 
-forwarding_unit forwarding(
+forward_unit forward_unit1(
 	 .Rs1_ID_EXE	(Rs1_ID_EXE),
 	 .Rs2_ID_EXE	(Rs2_ID_EXE),
 	 .Rd_EXE_MEM	(instruction_EXE_MEM),
@@ -296,7 +296,7 @@ alu#(
    .DATA_W(64)
 ) alu(
    .alu_in_0 (regfile_rdata_1_forward   ),
-   .alu_in_1 (alu_operand_2   ),
+   .alu_in_1 (regfile_rdata_2_forward   ),
    .alu_ctrl (alu_control     ),
    .alu_out  (alu_out         ),
    .zero_flag(zero_flag       ),
@@ -322,7 +322,7 @@ reg_arstn_en #(
 	.DATA_W(5)
 	)reg_instruction_EXE_MEM(
 		 .clk	(clk),
-		 .arst_n	(arst_n),
+		 .arst_n(arst_n),
 		 .en	(enable),
 		 .din (instruction_ID_EXE[4:0]),
 		 .dout (instruction_EXE_MEM)
