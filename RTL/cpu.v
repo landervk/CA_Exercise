@@ -272,14 +272,14 @@ mux_3 #(
    .mux_out (regfile_rdata_2_forward     )
 );
 
-// mux_2 #(
-   // .DATA_W(64)
-// ) alu_operand_mux (
-   // .input_a (immediate_extended_ID_EXE),
-   // .input_b (regfile_rdata_2_forward   ),
-   // .select_a (alu_src_ID_EXE          ),
-   // .mux_out (alu_operand_2     )
-// );
+mux_2 #(
+   .DATA_W(64)
+) alu_operand_mux (
+   .input_a (immediate_extended_ID_EXE),
+   .input_b (regfile_rdata_2_forward   ),
+   .select_a (alu_src_ID_EXE          ),
+   .mux_out (alu_operand_2     )
+);
 
 forward_unit forward_unit1(
 	 .Rs1_ID_EXE	(Rs1_ID_EXE),
@@ -296,7 +296,7 @@ alu#(
    .DATA_W(64)
 ) alu(
    .alu_in_0 (regfile_rdata_1_forward   ),
-   .alu_in_1 (regfile_rdata_2_forward   ),
+   .alu_in_1 (alu_operand_2   ),
    .alu_ctrl (alu_control     ),
    .alu_out  (alu_out         ),
    .zero_flag(zero_flag       ),
