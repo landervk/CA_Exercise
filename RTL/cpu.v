@@ -75,6 +75,12 @@ wire [63:0] mem_data_MEM_WB;
 // forward unit
 wire [1:0] alu_forward_A, alu_forward_B;
 
+wire [4:0] Rs1_ID_EXE, Rs2_ID_EXE;
+
+// hazard detection unit
+wire PCWrite, stallControl, IFIDWrite;
+wire [8:0] control_signals_mux;
+
 ///////// IF stage begin
 
 // program counter
@@ -121,7 +127,7 @@ reg_arstn_en #(
 	)reg_updated_pc_IF_ID(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
-		 .en	(enable),
+		 .en	(IFIDWrite),
 		 .din (updated_pc),
 		 .dout (updated_pc_IF_ID)
 );
@@ -132,7 +138,7 @@ reg_arstn_en #(
 	)reg_instruction_IF_ID(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
-		 .en	(enable),
+		 .en	(IFIDWrite),
 		 .din (instruction),
 		 .dout (instruction_IF_ID)
 );
@@ -159,6 +165,20 @@ control_unit control_unit(
    .reg_write(reg_write       ),
    .jump     (jump            )
 );
+
+hazard_detection_unit hazard_detection_unit(
+	 .mem_read_ID_EXE (mem_read_ID_EXE),
+	 .Rd_ID_EXE (instruction_ID_EXE[4:0]),
+	 .Rs1_IF_ID (instruction_IF_ID[19:15]),
+	 .Rs2_IF_ID (instruction_IF_ID[24:20]),
+	 .PCWrite (PCWrite),
+	 .IFIDWrite (IFIDWrite),
+	 .stallControl (stallControl)
+);
+
+// mux to stop control signals in case of stall
+// assign control_signals_mux = stallControl ? {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op} : 9'b0;
+assign control_signals_mux = {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op};
 
 register_file #(
    .DATA_W(64)
@@ -202,8 +222,6 @@ reg_arstn_en #(
 );
 
 // ID_EXE Pipeline register for instruction: {func7_5, funct7_0, func3, Rs2, Rs1, Rd}
-wire [4:0] Rs1_ID_EXE, Rs2_ID_EXE;
-
 reg_arstn_en #(
 	.DATA_W(20)
 	)reg_instruction_ID_EXE(
@@ -235,7 +253,7 @@ reg_arstn_en #(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din ({reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op}),
+		 .din (control_signals_mux),
 		 .dout ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE, jump_ID_EXE, alu_src_ID_EXE, alu_op_ID_EXE})
 );
 
