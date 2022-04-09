@@ -95,7 +95,7 @@ pc #(
    .branch    (branch_EXE_MEM    ),
    .jump      (jump_EXE_MEM      ),
    .current_pc(current_pc),
-   .enable    (enable    ),
+   .enable    (PCWrite    ),
    .updated_pc(updated_pc)
 );
 
@@ -171,14 +171,15 @@ hazard_detection_unit hazard_detection_unit(
 	 .Rd_ID_EXE (instruction_ID_EXE[4:0]),
 	 .Rs1_IF_ID (instruction_IF_ID[19:15]),
 	 .Rs2_IF_ID (instruction_IF_ID[24:20]),
+	 .enable (enable),
 	 .PCWrite (PCWrite),
 	 .IFIDWrite (IFIDWrite),
 	 .stallControl (stallControl)
 );
 
 // mux to stop control signals in case of stall
-// assign control_signals_mux = stallControl ? {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op} : 9'b0;
-assign control_signals_mux = {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op};
+assign control_signals_mux = stallControl ? {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op} : 9'b0;
+//assign control_signals_mux = {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op};
 
 register_file #(
    .DATA_W(64)
