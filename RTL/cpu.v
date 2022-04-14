@@ -41,13 +41,13 @@ module cpu(
 
 wire              zero_flag, zero_flag_EXE_MEM;
 wire [      63:0] branch_pc,updated_pc,current_pc,jump_pc;
-wire [      31:0] instruction;
+wire [      31:0] instruction, instruction_i;
 wire [       1:0] alu_op, alu_op_ID_EXE;
 wire [       3:0] alu_control;
 wire              reg_dst, branch, branch_ID_EXE, branch_EXE_MEM,mem_read, mem_read_ID_EXE, mem_read_EXE_MEM,
 				  				mem_2_reg, mem_2_reg_ID_EXE, mem_2_reg_EXE_MEM, mem_2_reg_MEM_WB,
                   mem_write,mem_write_ID_EXE, mem_write_EXE_MEM, alu_src, alu_src_ID_EXE, reg_write, reg_write_ID_EXE, reg_write_EXE_MEM,
-									reg_write_MEM_WB, jump, jump_ID_EXE, jump_EXE_MEM;
+									reg_write_MEM_WB, jump, jump_ID_EXE, jump_EXE_MEM, flush_if, arst_n_if, branch_taken;
 
 wire [       4:0] regfile_waddr;
 wire [      63:0] regfile_wdata ,mem_data,alu_out,
@@ -89,11 +89,11 @@ pc #(
 ) program_counter (
    .clk       (clk       ),
    .arst_n    (arst_n    ),
-   .branch_pc (branch_pc_EXE_MEM ),
-   .jump_pc   (jump_pc_EXE_MEM   ),
-   .zero_flag (zero_flag_EXE_MEM ),
-   .branch    (branch_EXE_MEM    ),
-   .jump      (jump_EXE_MEM      ),
+   .branch_pc (branch_pc ),
+   .jump_pc   (jump_pc   ),
+   .zero_flag (branch_taken ),
+   .branch    (branch    ),
+   .jump      (jump      ),
    .current_pc(current_pc),
    .enable    (PCWrite    ),
    .updated_pc(updated_pc)
@@ -109,7 +109,7 @@ sram_BW32 #(
    .wen      (1'b0          ),
    .ren      (1'b1          ),
    .wdata    (32'b0         ),
-   .rdata    (instruction   ),
+   .rdata    (instruction_i   ),
    .addr_ext (addr_ext      ),
    .wen_ext  (wen_ext       ),
    .ren_ext  (ren_ext       ),
@@ -133,6 +133,8 @@ reg_arstn_en #(
 );
 
 // IF_ID Pipeline register for instruction
+assign instruction = flush_if ? 32'b0 : instruction_i;
+
 reg_arstn_en #(
 	.DATA_W(32)
 	)reg_instruction_IF_ID(
@@ -155,6 +157,7 @@ immediate_extend_unit immediate_extend_u(
 
 control_unit control_unit(
    .opcode   (instruction_IF_ID[6:0]),
+	 .branch_taken 	(branch_taken),
    .alu_op   (alu_op          ),
    .reg_dst  (reg_dst         ),
    .branch   (branch          ),
@@ -163,7 +166,8 @@ control_unit control_unit(
    .mem_write(mem_write       ),
    .alu_src  (alu_src         ),
    .reg_write(reg_write       ),
-   .jump     (jump            )
+   .jump     (jump            ),
+	 .flush_if (flush_if				)
 );
 
 hazard_detection_unit hazard_detection_unit(
@@ -178,7 +182,7 @@ hazard_detection_unit hazard_detection_unit(
 );
 
 // mux to stop control signals in case of stall
-assign control_signals_mux = stallControl ? {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op} : 9'b0;
+assign control_signals_mux = stallControl ? {reg_write, mem_2_reg, mem_write, mem_read, alu_src, alu_op} : 7'b0;
 //assign control_signals_mux = {reg_write, mem_2_reg, mem_write, mem_read, branch, jump, alu_src, alu_op};
 
 register_file #(
@@ -195,32 +199,25 @@ register_file #(
    .rdata_2  (regfile_rdata_2)
 );
 
+branch_unit#(
+   .DATA_W(64)
+)branch_unit(
+   .updated_pc         (updated_pc_IF_ID     ),
+   .immediate_extended (immediate_extended),
+   .branch_pc          (branch_pc         ),
+   .jump_pc            (jump_pc           )
+);
+
+branch_comparator comparator(
+		.regfile_rdata_1	(regfile_rdata_1),
+		.regfile_rdata_2 	(regfile_rdata_2),
+		.branch_taken			(branch_taken)
+);
+
 ///////// ID STAGE END
 
 
 ///////// ID_EX REG BEGIN
-
-// ID_EXE Pipeline register for immediate_extended
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg_im_ext_ID_EX(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din (immediate_extended),
-		 .dout (immediate_extended_ID_EXE)
-);
-
-// ID_EXE Pipeline register for updated program counter
-reg_arstn_en #(
-	.DATA_W(64)
-	)reg_updated_pc_ID_EXE(
-		 .clk	(clk),
-		 .arst_n	(arst_n),
-		 .en	(enable),
-		 .din (updated_pc_IF_ID),
-		 .dout (updated_pc_ID_EXE)
-);
 
 // ID_EXE Pipeline register for instruction: {func7_5, funct7_0, func3, Rs2, Rs1, Rd}
 reg_arstn_en #(
@@ -249,13 +246,13 @@ reg_arstn_en #(
 
 // ID_EXE Pipeline register for control signals
 reg_arstn_en #(
-	.DATA_W(9)
+	.DATA_W(7)
 	)reg_control_ID_EXE(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
 		 .din (control_signals_mux),
-		 .dout ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE, jump_ID_EXE, alu_src_ID_EXE, alu_op_ID_EXE})
+		 .dout ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, alu_src_ID_EXE, alu_op_ID_EXE})
 );
 
 ///////// ID_EX REG END
@@ -291,14 +288,8 @@ mux_3 #(
    .mux_out (regfile_rdata_2_forward     )
 );
 
-mux_2 #(
-   .DATA_W(64)
-) alu_operand_mux (
-   .input_a (immediate_extended_ID_EXE),
-   .input_b (regfile_rdata_2_forward   ),
-   .select_a (alu_src_ID_EXE          ),
-   .mux_out (alu_operand_2     )
-);
+
+
 
 forward_unit forward_unit1(
 	 .Rs1_ID_EXE	(Rs1_ID_EXE),
@@ -315,20 +306,11 @@ alu#(
    .DATA_W(64)
 ) alu(
    .alu_in_0 (regfile_rdata_1_forward   ),
-   .alu_in_1 (alu_operand_2   ),
+   .alu_in_1 (regfile_rdata_2_forward   ),
    .alu_ctrl (alu_control     ),
    .alu_out  (alu_out         ),
    .zero_flag(zero_flag       ),
    .overflow (                )
-);
-
-branch_unit#(
-   .DATA_W(64)
-)branch_unit(
-   .updated_pc         (updated_pc_ID_EXE     ),
-   .immediate_extended (immediate_extended_ID_EXE),
-   .branch_pc          (branch_pc         ),
-   .jump_pc            (jump_pc           )
 );
 
 ///////// EX STAGE END
@@ -369,26 +351,15 @@ reg_arstn_en #(
 		 .dout (regfile_rdata_2_EXE_MEM)
 );
 
-// EX_MEM Pipeline register for branch_pc and jump_pc
-reg_arstn_en #(
-	.DATA_W(128)
-	)reg_branch_unit_EXE_MEM(
-		 .clk	(clk),
-		 .arst_n(arst_n),
-		 .en	(enable),
-		 .din ({branch_pc, jump_pc}),
-		 .dout ({branch_pc_EXE_MEM, jump_pc_EXE_MEM})
-);
-
 // EX_MEM Pipeline register for control signals
 reg_arstn_en #(
-	.DATA_W(6)
+	.DATA_W(4)
 	)reg3_control(
 		 .clk	(clk),
 		 .arst_n	(arst_n),
 		 .en	(enable),
-		 .din ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE, branch_ID_EXE, jump_ID_EXE}),
-		 .dout ({reg_write_EXE_MEM, mem_2_reg_EXE_MEM, mem_write_EXE_MEM, mem_read_EXE_MEM, branch_EXE_MEM, jump_EXE_MEM})
+		 .din ({reg_write_ID_EXE, mem_2_reg_ID_EXE, mem_write_ID_EXE, mem_read_ID_EXE}),
+		 .dout ({reg_write_EXE_MEM, mem_2_reg_EXE_MEM, mem_write_EXE_MEM, mem_read_EXE_MEM})
 );
 
 ///////// EX_MEM REG END

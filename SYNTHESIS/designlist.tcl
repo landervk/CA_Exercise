@@ -16,4 +16,6 @@ set verilog_files { \
    reg_arstn_en
    register_file
    sram
+   branch_comparator
+   hazard_detection_unit
 }

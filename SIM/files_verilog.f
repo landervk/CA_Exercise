@@ -15,3 +15,4 @@
 ../RTL/saed32sram_mod.v
 ../RTL/forward_unit.v
 ../RTL/hazard_detection_unit.v
+../RTL/branch_comparator.v
