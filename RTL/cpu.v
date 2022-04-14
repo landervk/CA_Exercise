@@ -219,6 +219,17 @@ branch_comparator comparator(
 
 ///////// ID_EX REG BEGIN
 
+// ID_EXE Pipeline register for immediate_extended
+reg_arstn_en #(
+	.DATA_W(64)
+	)reg_im_ext_ID_EX(
+		 .clk	(clk),
+		 .arst_n	(arst_n),
+		 .en	(enable),
+		 .din (immediate_extended),
+		 .dout (immediate_extended_ID_EXE)
+);
+
 // ID_EXE Pipeline register for instruction: {func7_5, funct7_0, func3, Rs2, Rs1, Rd}
 reg_arstn_en #(
 	.DATA_W(20)
@@ -288,7 +299,14 @@ mux_3 #(
    .mux_out (regfile_rdata_2_forward     )
 );
 
-
+mux_2 #(
+   .DATA_W(64)
+) alu_operand_mux (
+   .input_a (immediate_extended_ID_EXE),
+   .input_b (regfile_rdata_2_forward   ),
+   .select_a (alu_src_ID_EXE          ),
+   .mux_out (alu_operand_2     )
+);
 
 
 forward_unit forward_unit1(
@@ -306,7 +324,7 @@ alu#(
    .DATA_W(64)
 ) alu(
    .alu_in_0 (regfile_rdata_1_forward   ),
-   .alu_in_1 (regfile_rdata_2_forward   ),
+   .alu_in_1 (alu_operand_2   ),
    .alu_ctrl (alu_control     ),
    .alu_out  (alu_out         ),
    .zero_flag(zero_flag       ),
